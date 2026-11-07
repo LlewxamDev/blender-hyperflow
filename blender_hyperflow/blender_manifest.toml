@@ -1,0 +1,11 @@
+schema_version = "1.0.0"
+
+id = "blender_hyperflow"
+version = "1.0.0"
+name = "HyperFlow 3D Suite"
+tagline = "1-click quad retopology, multi-map baking & next-gen rendering"
+maintainer = "Evandro & HyperFlow Open Source Contributors"
+type = "add-on"
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+tags = ["Mesh", "Bake", "Render", "Compositing"]

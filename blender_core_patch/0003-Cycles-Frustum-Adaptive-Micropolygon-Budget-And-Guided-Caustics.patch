@@ -1,0 +1,60 @@
+From 78b96787d74e9105f41b67928625299fd09ed6a3 Mon Sep 17 00:00:00 2001
+From: "Llew (LlewxamDev)" <LlewxamDev@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 20:55:15 -0300
+Subject: [PATCH] Cycles: Per-patch micropolygon dicing budget guard & Ptex UV
+ index fix
+
+1. Adds `max_patch_triangles` budget guard to `SubdParams` and `EdgeDice::scale_factor`
+   to prevent Out-Of-Memory triangle explosion on near-clipping adaptive subdivision patches.
+2. Fixes copy-paste index bug in `EdgeDice::set_triangle` where `mesh_ptex_uv` wrote
+   all three UV corners to `triangle_index * 3 + 0`.
+
+Authored-by: Llew (@LlewxamDev)
+---
+ intern/cycles/subd/dice.cpp | 10 +++++-----
+ intern/cycles/subd/dice.h   |  1 +
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/intern/cycles/subd/dice.cpp b/intern/cycles/subd/dice.cpp
+index 7e3a992..ce73fdd 100644
+--- a/intern/cycles/subd/dice.cpp
++++ b/intern/cycles/subd/dice.cpp
+@@ -82,9 +82,9 @@ float EdgeDice::scale_factor(const SubPatch &sub, const int Mu, const int Mv)
+   const float A4 = quad_area(P[1][1], P[2][1], P[1][2], P[2][2]);
+   const float Apatch = max(A1, max(A2, max(A3, A4))) * 4.0f;
+ 
+-  /* solve for scaling factor */
+-  const float Atri = params.dicing_rate * params.dicing_rate * 0.5f;
+-  const float Ntris = Apatch / Atri;
++  /* solve for scaling factor with per-patch micropolygon budget guard to prevent OOM */
++  const float Atri = max(params.dicing_rate * params.dicing_rate * 0.5f, 1e-4f);
++  const float Ntris = min(Apatch / Atri, (float)max(params.max_patch_triangles, 1));
+ 
+   // XXX does the -sqrt solution matter
+   // XXX max(D, 0.0) is highly suspicious, need to test cases
+@@ -138,8 +138,8 @@ void EdgeDice::set_triangle(const SubPatch &sub,
+   }
+   if (mesh_ptex_uv) {
+     mesh_ptex_uv[triangle_index * 3 + 0] = uv0;
+-    mesh_ptex_uv[triangle_index * 3 + 0] = uv1;
+-    mesh_ptex_uv[triangle_index * 3 + 0] = uv2;
++    mesh_ptex_uv[triangle_index * 3 + 1] = uv1;
++    mesh_ptex_uv[triangle_index * 3 + 2] = uv2;
+   }
+ 
+   /* TODO: batch together multiple triangles. */
+diff --git a/intern/cycles/subd/dice.h b/intern/cycles/subd/dice.h
+index 1d3dda9..70633ef 100644
+--- a/intern/cycles/subd/dice.h
++++ b/intern/cycles/subd/dice.h
+@@ -30,6 +30,7 @@ struct SubdParams {
+   int split_threshold = 1;
+   float dicing_rate = 1.0f;
+   int max_level = 12;
++  int max_patch_triangles = 65536;
+   Camera *camera = nullptr;
+   Transform objecttoworld = transform_identity();
+ 
+-- 
+2.55.0.windows.5
+

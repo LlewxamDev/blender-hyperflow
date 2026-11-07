@@ -1,0 +1,66 @@
+{
+  "blender_version": "5.2.2 LTS",
+  "status": "ALL_TESTS_PASSED",
+  "total_duration_seconds": 28.38,
+  "module_1_retopo_bake": {
+    "highpoly_faces": 31488,
+    "lowpoly_faces": 1220,
+    "reduction_percent": 96.13,
+    "quad_ratio_percent": 100.0,
+    "mean_surface_error_pct": 0.0009,
+    "max_surface_error_pct": 0.4054,
+    "feature_edges_detected": 2235,
+    "uv_coverage_percent": 37.54,
+    "elapsed_seconds": 13.59,
+    "map_stats": {
+      "normal": {
+        "mean": 0.6594,
+        "std": 0.2395,
+        "path": "c:\\Users\\Evandro\\Downloads\\pull_requests\\test_outputs\\retopo_bake\\Sculpt_Guardian_High_Retopo_Low_normal.png"
+      },
+      "ao": {
+        "mean": 0.6646,
+        "std": 0.3901,
+        "path": "c:\\Users\\Evandro\\Downloads\\pull_requests\\test_outputs\\retopo_bake\\Sculpt_Guardian_High_Retopo_Low_ao.png"
+      },
+      "displacement": {
+        "mean": 0.4929,
+        "std": 0.0453,
+        "path": "c:\\Users\\Evandro\\Downloads\\pull_requests\\test_outputs\\retopo_bake\\Sculpt_Guardian_High_Retopo_Low_displacement.png"
+      },
+      "curvature": {
+        "mean": 0.5307,
+        "std": 0.1238,
+        "path": "c:\\Users\\Evandro\\Downloads\\pull_requests\\test_outputs\\retopo_bake\\Sculpt_Guardian_High_Retopo_Low_curvature.png"
+      }
+    }
+  },
+  "module_2_temporal_denoiser": {
+    "noisy_flicker": 0.01521,
+    "oidn_single_frame_flicker": 0.00734,
+    "hyperflow_temporal_flicker": 0.00593,
+    "flicker_reduction_vs_noisy_pct": 60.98,
+    "flicker_reduction_vs_oidn_pct": 19.13,
+    "psnr_noisy_db": 33.0,
+    "psnr_oidn_db": 41.65,
+    "psnr_temporal_db": 42.03
+  },
+  "module_3_micropolygon_nanite": {
+    "base_faces": 576,
+    "uniform_equivalent_faces": 589824,
+    "adaptive_actual_faces": 8256,
+    "near_field_micropoly_faces": 2724,
+    "memory_uniform_mb": 81.0,
+    "memory_adaptive_mb": 1.13,
+    "memory_savings_percent": 98.6,
+    "near_camera_edge_length_mm": 65.12
+  },
+  "module_4_caustics_guiding": {
+    "guiding_distribution": "PARALLAX_AWARE_VMM",
+    "naive_caustic_peak_p95": 0.1333,
+    "hyperflow_caustic_peak_p95": 0.8275,
+    "naive_caustic_contrast_std": 0.0264,
+    "hyperflow_caustic_contrast_std": 0.1609,
+    "energy_gain_ratio": 6.21
+  }
+}

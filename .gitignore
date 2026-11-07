@@ -1,0 +1,5 @@
+upstream_ref/
+__pycache__/
+*.pyc
+test_outputs/temporal_denoise/*.exr
+showcase_renders/_*.png
