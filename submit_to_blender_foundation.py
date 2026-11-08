@@ -17,6 +17,7 @@ import argparse
 import base64
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from build_verified_patches import build_modified_files
@@ -40,7 +41,7 @@ def gitea_request(method: str, endpoint: str, token: str, payload: dict = None) 
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=45) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else {}
     except urllib.error.HTTPError as e:
@@ -49,15 +50,24 @@ def gitea_request(method: str, endpoint: str, token: str, payload: dict = None) 
 
 
 def ensure_fork(token: str, username: str) -> str:
+    fork_full = f"{username}/blender"
     try:
-        info = gitea_request("GET", f"repos/{username}/blender", token)
+        info = gitea_request("GET", f"repos/{fork_full}", token)
         print(f"Found existing fork on projects.blender.org: {info['html_url']}")
-        return f"{username}/blender"
     except RuntimeError:
-        print("Forking blender/blender on projects.blender.org...")
+        print("Forking blender/blender on projects.blender.org (this takes ~10-20s)...")
         info = gitea_request("POST", "repos/blender/blender/forks", token, {"name": "blender"})
-        print(f"Fork created: {info['html_url']}")
-        return f"{username}/blender"
+        print(f"Fork requested: {info.get('html_url', f'https://projects.blender.org/{fork_full}')}")
+
+    # Wait until the fork's `main` branch is ready on Gitea
+    for attempt in range(24):
+        try:
+            gitea_request("GET", f"repos/{fork_full}/branches/main", token)
+            return fork_full
+        except RuntimeError:
+            print(f"  Waiting for Gitea to finish indexing fork ({attempt + 1}/24)...")
+            time.sleep(3)
+    return fork_full
 
 
 def push_branch_and_create_pr(
@@ -74,7 +84,9 @@ def push_branch_and_create_pr(
     # Check if branch exists on fork, create from main if not
     try:
         gitea_request("GET", f"repos/{fork_repo}/branches/{branch_name}", token)
+        print(f"Branch `{branch_name}` already exists on `{fork_repo}`.")
     except RuntimeError:
+        print(f"Creating branch `{branch_name}` from `main` on `{fork_repo}`...")
         gitea_request(
             "POST",
             f"repos/{fork_repo}/branches",
@@ -99,23 +111,32 @@ def push_branch_and_create_pr(
         )
 
     head_ref = f"{username}:{branch_name}" if target_repo != fork_repo else branch_name
-    pr_info = gitea_request(
-        "POST",
-        f"repos/{target_repo}/pulls",
-        token,
-        {
-            "base": "main",
-            "head": head_ref,
-            "title": pr_title,
-            "body": pr_body,
-        },
-    )
-    return pr_info["html_url"]
+    try:
+        pr_info = gitea_request(
+            "POST",
+            f"repos/{target_repo}/pulls",
+            token,
+            {
+                "base": "main",
+                "head": head_ref,
+                "title": pr_title,
+                "body": pr_body,
+            },
+        )
+        return pr_info["html_url"]
+    except RuntimeError as err:
+        if "pull request already exists" in str(err).lower() or "409" in str(err) or "422" in str(err):
+            return f"https://projects.blender.org/{target_repo}/pulls (PR for {branch_name} already open)"
+        raise
 
 
 def main():
     parser = argparse.ArgumentParser(description="Submit HyperFlow 3D C++ PRs to projects.blender.org")
-    parser.add_argument("--token", required=True, help="Gitea Personal Access Token from projects.blender.org")
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("BLENDER_GITEA_TOKEN", "").strip(),
+        help="Gitea Personal Access Token from projects.blender.org (or set BLENDER_GITEA_TOKEN env var)",
+    )
     parser.add_argument(
         "--open-upstream-prs",
         action="store_true",
@@ -123,18 +144,28 @@ def main():
     )
     args = parser.parse_args()
 
-    user_info = gitea_request("GET", "user", args.token)
+    token = args.token
+    if not token or token == "SEU_TOKEN_AQUI":
+        print("\n=== Autenticacao projects.blender.org (Gitea Oficial da Blender Foundation) ===")
+        print("1. Acesse: https://projects.blender.org/user/settings/applications")
+        print("2. Em 'Generate New Token', digite um nome (ex: HyperFlow), marque 'repository (Read and Write)' e 'user (Read)' e clique em Generate Token.")
+        token = input("3. Cole o Token gerado aqui e aperte ENTER: ").strip()
+
+    if not token:
+        raise SystemExit("Erro: Nenhum token informado.")
+
+    user_info = gitea_request("GET", "user", token)
     username = user_info["login"]
     print(f"Authenticated on projects.blender.org as: {username}")
 
-    fork_repo = ensure_fork(args.token, username)
+    fork_repo = ensure_fork(token, username)
     target_repo = "blender/blender" if args.open_upstream_prs else fork_repo
 
     files_map = build_modified_files()
     bodies = build_pr_bodies()
 
     pr1 = push_branch_and_create_pr(
-        token=args.token,
+        token=token,
         fork_repo=fork_repo,
         target_repo=target_repo,
         username=username,
@@ -149,7 +180,7 @@ def main():
     print("Created PR #1 on projects.blender.org:", pr1)
 
     pr2 = push_branch_and_create_pr(
-        token=args.token,
+        token=token,
         fork_repo=fork_repo,
         target_repo=target_repo,
         username=username,
@@ -164,7 +195,7 @@ def main():
     print("Created PR #2 on projects.blender.org:", pr2)
 
     pr3 = push_branch_and_create_pr(
-        token=args.token,
+        token=token,
         fork_repo=fork_repo,
         target_repo=target_repo,
         username=username,
@@ -178,6 +209,19 @@ def main():
         pr_body=bodies["p3"],
     )
     print("Created PR #3 on projects.blender.org:", pr3)
+
+    pr4 = push_branch_and_create_pr(
+        token=token,
+        fork_repo=fork_repo,
+        target_repo=target_repo,
+        username=username,
+        branch_name="feat-hyperflow-unified-suite",
+        commit_msg="HyperFlow 3D Suite: Unified Modeling, Compositor & Cycles Core Enhancements",
+        files_dict={k: v[1] for k, v in files_map.items()},
+        pr_title="HyperFlow 3D Suite: Unified Modeling, Compositor & Cycles Core Enhancements",
+        pr_body=bodies["unified"],
+    )
+    print("Created PR #4 (Unified) on projects.blender.org:", pr4)
 
 
 if __name__ == "__main__":
